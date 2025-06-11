@@ -3,7 +3,8 @@
 #include "device_launch_parameters.h"
 #include <iostream>
 
-static uint8_t* img_buffer_host = nullptr;
+static int defult_img_size = 1920*1920*3/2; // Example size for 1920x1920 YUV420 image
+static uint8_t* img_buffer_host = new uint8_t[defult_img_size];
 static uint8_t* img_buffer_device = nullptr;
 
 __global__ void yuv420toRGBKernel(uint8_t* yuv420, int width, int height, uint8_t* rgb) {
@@ -25,12 +26,19 @@ __global__ void yuv420toRGBKernel(uint8_t* yuv420, int width, int height, uint8_
 void yuv420toRGBInPlace(uint8_t* yuv420, int width, int height, uint8_t* rgb, cudaStream_t stream) {
     int img_size = width * height * 3 / 2;
 
-    if (img_buffer_host == nullptr) {
+    if (img_buffer_host == nullptr || img_size > defult_img_size) {
+        if (img_buffer_host) {
+            delete[] img_buffer_host;
+        }
         img_buffer_host = new uint8_t[img_size];
     }
-    if (img_buffer_device == nullptr) {
-        cudaMalloc(&img_buffer_device, img_size);
+    if (img_buffer_device == nullptr || img_size > defult_img_size) {
+        if (img_buffer_device) {
+            CUDA_CHECK(cudaFree(img_buffer_device));
+        }
+        CUDA_CHECK(cudaMalloc(&img_buffer_device, img_size));
     }
+    defult_img_size = img_size;
 
     memcpy(img_buffer_host, yuv420, img_size);
 
@@ -41,16 +49,6 @@ void yuv420toRGBInPlace(uint8_t* yuv420, int width, int height, uint8_t* rgb, cu
     int pixels = width * height;
     int numThreads = 256;
     int numBlocks = ceil(pixels / (float)numThreads);
-    std::cout << "yuv420toRGBKernel start." << std::endl;
+    // Launch the kernel with the specified number of blocks and threads
     yuv420toRGBKernel<<<numBlocks, numThreads, 0 , stream>>>(img_buffer_device, width, height, rgb);
-    std::cout << "yuv420toRGBKernel done." << std::endl;
-    // Add error checking after kernel launch
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        std::cerr << "CUDA kernel launch error: " << cudaGetErrorString(err) << std::endl;
-    }
-    err = cudaStreamSynchronize(stream);
-    if (err != cudaSuccess) {
-        std::cerr << "CUDA stream sync error: " << cudaGetErrorString(err) << std::endl;
-    }
 }

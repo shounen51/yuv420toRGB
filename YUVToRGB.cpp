@@ -33,8 +33,9 @@ int main(int argc, char** argv) {
     CUDA_CHECK(cudaStreamCreate(&stream));
     // 將 yuv 轉換成 rgb
     yuv420toRGBInPlace(frame, input_w, input_h, gpu_rgb_buffer, stream);
-    // 等待 GPU 完成處理
-    CUDA_CHECK(cudaStreamSynchronize(stream));
+    // 釋放 CUDA event
+    CUDA_CHECK(cudaEventDestroy(start));
+    CUDA_CHECK(cudaEventDestroy(stop));
     // 釋放 CUDA stream
     CUDA_CHECK(cudaStreamDestroy(stream));
 
@@ -53,7 +54,7 @@ int main(int argc, char** argv) {
     CUDA_CHECK(cudaFree(gpu_rgb_buffer));
     delete[] frame;
     cv::destroyAllWindows();
-    cout << "Program finished successfully." << std::endl;
+    std::cout << "Program finished successfully." << std::endl;
     return 0;
 
 }
