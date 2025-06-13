@@ -27,3 +27,37 @@ void yuv420toRGBInPlace(uint8_t* yuv420, int width, int height, uint8_t* rgb, cu
     // Launch the kernel with the specified number of blocks and threads
     yuv420toRGBKernel<<<numBlocks, numThreads, 0 , stream>>>(yuv420, width, height, rgb);
 }
+
+void yuv420toRGBCPU(uint8_t* yuv420, int width, int height, uint8_t* rgb) {
+    int frameSize = width * height;
+    int chromaWidth = width / 2;
+    int chromaHeight = height / 2;
+    uint8_t* yPlane = yuv420;
+    uint8_t* uPlane = yuv420 + frameSize;
+    uint8_t* vPlane = yuv420 + frameSize + (frameSize / 4);
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int yIdx = y * width + x;
+            int uIdx = (y / 2) * chromaWidth + (x / 2);
+            int vIdx = (y / 2) * chromaWidth + (x / 2);
+
+            int Y = yPlane[yIdx];
+            int U = uPlane[uIdx];
+            int V = vPlane[vIdx];
+
+            int r = Y + 1.402 * (V - 128);
+            int g = Y - 0.344136 * (U - 128) - 0.714136 * (V - 128);
+            int b = Y + 1.772 * (U - 128);
+
+            rgb[yIdx * 3 + 0] = std::min(std::max(r, 0), 255);
+            rgb[yIdx * 3 + 1] = std::min(std::max(g, 0), 255);
+            rgb[yIdx * 3 + 2] = std::min(std::max(b, 0), 255);
+        }
+    }
+}
+
+void yuv420toRGBInPlace_cpu(uint8_t* yuv420, int width, int height, uint8_t* rgb, cudaStream_t stream) {
+    // Launch the kernel with the specified number of blocks and threads
+    yuv420toRGBCPU(yuv420, width, height, rgb);
+}
